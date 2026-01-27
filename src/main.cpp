@@ -5,6 +5,9 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <algorithm>
+#include <filesystem>
 
 #include "iterative_modification_heuristic.hpp"
 #include "utils.hpp"
