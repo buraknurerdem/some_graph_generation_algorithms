@@ -1,6 +1,8 @@
 #include "find_odd_holes.hpp"
 #include "utils.hpp"
 
+#include <algorithm>
+
 void odd_hole_recursive(
     const std::vector<std::vector<bool>> &graph_adj_mat,
     const std::vector<std::vector<int>> &graph_adj_list,
