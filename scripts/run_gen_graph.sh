@@ -1,93 +1,87 @@
 #!/bin/bash
 # Author: Burak Nur Erdem
 
-# Possible Types: erdos-renyi, barabasi-albert, threshold, perfect-operations, perturb-vertex-pairs, IMH, sandwich_outer, embed-hole, IMH-near-perfect, c5-free
-# Check the script below for additional parameters for specific generation types
+###########################################
+### Parameters for all generation types ###
+###########################################
+
+OUTPUT_FORMAT="g6" # Possible Values: "g6", "adj_matrices", "g6_and_adj_matrices"
+OUTPUTS_ADJ_MAT_DIR="graphs/perfect-operations" # Folder path to write the results
+OUTPUTS_G6_FILE_PATH="graphs/perfect-operations/graphs.g6" # Folder path to write the results
+TYPE="perfect-operations" # Graph type to be generated. Possible Types: erdos-renyi, barabasi-albert, threshold,
+#                           perfect-operations, perturb-vertex-pairs, IMH, sandwich-outer, embed-hole, IMH-near-perfect, c5-free
+
+############################################
+### Parameters for some generation types ###
+############################################
+
+# For some generation types the main loop is over (ORDERS X DENSITIES X REPETITON)
+ORDERS=(5) # Graph order list
+DENSITIES=(25) # Density list (after decimal point)
+REPETITION=4 # For each order and density how many graphs are generated
+
+# For the remaining graph generation types the main loop is over the graphs in the INPUT_PATH
+INPUT_PATH="graphs/perfect-operations"
+
+PERFECT_POOL="/Users/burakerdem/showg" # Relevant in << perfect-operations >>. The folder of the perfect graphs that will be used.
+EPSILON=0.1 # Relevant in << perfect-operations >>. Tolerance from the target density.
+FORCE_NONPERFECT=TRUE # Relevant in << c5-free >>. If set to "TRUE". The algorithm is repeated until it generates a graph of $TYPE that is not perfect.
+VERTEX_PAIR_RATIO=0.5 # Relevant in << perturb-vertex-pairs: ratio of vertex pairs whose state will be flipped,
+#                                      sandwich-outer: ratio of non-edges to be changed to edges >>.
+INT_PARAM1=5 # Relevant in << IMH-near-perfect: The upper bound on the allowed hole count,
+#                              embed-hole: size of the hole to be embedded into the input graph >>
 
 
-# You may define input/output directories as full paths or relative to this script's location
-INPUTS_DIR="graphs/perfect"
-OUTPUTS_DIR="graphs/perturbed"
+###############################################################
+##                      Program Call                      #####
+## A regular user does not need to change anything below. #####
+###############################################################
 
-TYPE="c5-free" # Graph type to be generated
-ORDERS=(65 70 75 80 85 90) # Graph order list
-DENSITIES=(25 50 75) # Density list (after decimal point)
-REPETITION=5 # For each order and density how many graphs are generated
+mkdir -p "$OUTPUTS_ADJ_MAT_DIR" # Ensuring output directory exists
+mkdir -p "$(dirname "$OUTPUTS_G6_FILE_PATH")"
 
-mkdir -p "$OUTPUTS_DIR" # Ensure output directory exist
-
+# If looping over orders densities and repetitions
 if [ "$TYPE" == "perfect-operations" ] || [ "$TYPE" == "erdos-renyi" ] || [ "$TYPE" == "threshold" ] || [ "$TYPE" == "barabasi-albert" ] || [ "$TYPE" == "c5-free" ] ; then
     for n in "${ORDERS[@]}"; do
         for d in "${DENSITIES[@]}"; do
             for ((id=1; id<=REPETITION; id++ )); do
-                if [ "$TYPE" == "perfect-operations" ]; then
-                    epsilon=0.03
-                    input_pool_path="/Users/burakerdem/showg/perfect_mckay" # Perfect graphs to be used in the operations. 
-                    ./bin/gen_graph "$TYPE" "$n" "$d" "$id" "$epsilon" "$input_pool_path" "$OUTPUTS_DIR"
-                elif [ "$TYPE" == "erdos-renyi" ] || [ "$TYPE" == "threshold" ] || [ "$TYPE" == "barabasi-albert" ] || [ "$TYPE" == "c5-free" ]; then
-                    FORCE_NONPERFECT=TRUE
-                    ./bin/gen_graph "$TYPE" "$n" "$d" "$id" "$OUTPUTS_DIR" "$FORCE_NONPERFECT"
-                else
-                    echo "Error: Unknown graph type specified."
-                    exit 1
-                fi
+                output_adj_mat_file_path=$(printf "%s/graph_%s_%05d_%-05s_%05d.txt" "$OUTPUTS_ADJ_MAT_DIR" "$TYPE" "$n" "$d" "$id" | tr ' ' '0')
+                ./bin/gen_graph -t $TYPE -n $n -d $d -i $id -o $output_adj_mat_file_path -f $OUTPUT_FORMAT -g $OUTPUTS_G6_FILE_PATH \
+                    -e $EPSILON --perfectpool $PERFECT_POOL \
+                     --forcenonperfect $FORCE_NONPERFECT --vertexpairratio $VERTEX_PAIR_RATIO
             done
         done
     done
-elif [ "$TYPE" == "perturb-vertex-pairs" ]; then
-    for input_file in "$INPUTS_DIR"/*; do
-
-        perturb_ratios=(0.1 0.3 0.5 0.7 0.9)
-        for pr in "${perturb_ratios[@]}"; do        
-            # output file name is defined here. can be changed
-            filename="${input_file##*/}"
-            typename="perturb-from-perfect-op" 
-            parts=(${filename//_/ })
-            output_filename="${parts[0]}_${typename}_${parts[2]}_${parts[3]}-${pr}_${parts[4]}"
-            output_file="$OUTPUTS_DIR/$output_filename"
-            ./bin/gen_graph "$TYPE" "$input_file" "$pr" "$output_file"
-        done
-    done
-elif [ "$TYPE" == "IMH" ]; then
-    for input_file in "$INPUTS_DIR"/*; do
-        filename="${input_file##*/}" 
-        parts=(${filename//_/ })
-        output_filename="${parts[0]}_${TYPE}_${parts[2]}_${parts[3]}_${parts[4]}"
-        output_file="$OUTPUTS_DIR/$output_filename"
-        ./bin/gen_graph "$TYPE" "$input_file" "$output_file"
-    done
-elif [ "$TYPE" == "IMH-near-perfect" ]; then
-    max_allowed_hole_count=20
-    for input_file in "$INPUTS_DIR"/*; do
-        filename="${input_file##*/}" 
-        parts=(${filename//_/ })
-        output_filename="${parts[0]}_${TYPE}_${parts[2]}_${parts[3]}_${parts[4]}"
-        output_file="$OUTPUTS_DIR/$output_filename"
-        ./bin/gen_graph "$TYPE" "$input_file" "$max_allowed_hole_count" "$output_file"
-    done
-elif [ "$TYPE" == "sandwich_outer" ]; then
-    for input_file in "$INPUTS_DIR"/*; do
-        # output file name is defined here. can be changed
-        graph_type="sandwich"
-        filename="${input_file##*/}" 
-        parts=(${filename//_/ })
-        output_filename="${parts[0]}_${graph_type}_${parts[2]}_${parts[3]}_${parts[4]}"
-        output_file="$OUTPUTS_DIR/$output_filename"
-        # output_file="$OUTPUTS_DIR/${input_file##*/}"
-        optional_edge_density=1
-        ./bin/gen_graph "$TYPE" "$input_file" "$optional_edge_density" "$output_file"
-    done
-elif [ "$TYPE" == "embed-hole" ]; then
-    for input_file in "$INPUTS_DIR"/*; do
-        hole_length=5
-        graph_type="embedded-hole-5-from"
-        filename="${input_file##*/}" 
-        parts=(${filename//_/ })
-        output_filename="${parts[0]}_${graph_type}_${parts[2]}_${parts[3]}_${parts[4]}"
-        output_file="$OUTPUTS_DIR/$output_filename"
-        ./bin/gen_graph "$TYPE" "$input_file" "$hole_length" "$output_file"
-    done
+# If looping over an input
 else
-    echo "Error: Unknown graph type specified."
-    exit 1
+    # If input is a single .g6 file
+    if [[ "$INPUT_PATH" == *.g6 ]]; then
+    line_num=1
+    while IFS= read -r g6_string; do
+        
+        # Skip empty lines
+        [[ -z "$g6_string" ]] && continue
+
+        output_file_name="graph_${TYPE}_line_${line_num}.txt"
+        output_adj_mat_file_path="$OUTPUTS_ADJ_MAT_DIR/$output_file_name"
+
+        ./bin/gen_graph -t $TYPE -o "$output_adj_mat_file_path" -e "$EPSILON" -f "$OUTPUT_FORMAT" \
+            -g "$OUTPUTS_G6_FILE_PATH" --perfectpool "$PERFECT_POOL" --intparam1 "$INT_PARAM1" \
+            --inputg6 "$g6_string" --forcenonperfect "$FORCE_NONPERFECT" \
+            --vertexpairratio "$VERTEX_PAIR_RATIO"
+
+        ((line_num++))
+    done < "$INPUT_PATH"
+    # If input is a folder of adjacency matrices
+    else
+        for input_file_path in "$INPUT_PATH"/*; do
+            input_file_name="${input_file_path##*/}"
+            parts=(${input_file_name//_/ })
+            output_file_name="${parts[0]}_${TYPE}_${parts[2]}_${parts[3]}_${parts[4]}"
+            output_adj_mat_file_path="$OUTPUTS_ADJ_MAT_DIR/$output_file_name"
+            ./bin/gen_graph -t $TYPE -o $output_adj_mat_file_path -e $EPSILON -f $OUTPUT_FORMAT -g $OUTPUTS_G6_FILE_PATH \
+                --perfectpool $PERFECT_POOL --intparam1 $INT_PARAM1 \
+                --inputfilepath $input_file_path --forcenonperfect $FORCE_NONPERFECT --vertexpairratio $VERTEX_PAIR_RATIO
+        done
+    fi
 fi

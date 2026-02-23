@@ -1,10 +1,22 @@
+// Author: Burak Nur Erdem
+
 #pragma once
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <cstdint>
+#include <random>
 
+enum operation_type
+{
+    COMPLETE_JOIN,
+    DISJOINT_UNION,
+    OPERATION_SUBSTITUTION,
+    OPERATION_COMPOSITION,
+    OPERATION_CLIQUE_ID,
+    COMPLEMENT
+};
 
 struct graph_file_info
 {
@@ -62,19 +74,11 @@ bool parse_graph_filename(const std::string &filepath, graph_file_info &graph_fi
 
 bool is_matrix_symmetric(const std::vector<std::vector<bool>> &mat);
 
-std::vector<int>
-find_a_maximal_clique_including_a_given_vertex(const std::vector<std::vector<bool>> &graph, int v);
+std::vector<int> find_a_maximal_clique_including_a_given_vertex(const std::vector<std::vector<bool>> &graph, int v);
 
-void write_graph_to_file(
-    std::vector<std::vector<bool>> &graph,
-    std::string graph_folder,
-    std::string type,
-    int order,
-    std::string density_dec_str,
-    int id
-);
+std::string create_output_adj_matrix_file_name(std::vector<std::vector<bool>> &graph, std::string graph_folder, std::string type, int order, std::string density_dec_str, int id);
 
-void write_graph_to_file_given_filename(std::vector<std::vector<bool>> &graph, std::string output_file_name);
+void write_adj_matrix(std::vector<std::vector<bool>> &graph, std::string output_file_name);
 
 void remove_vertex_from_graph(std::vector<std::vector<bool>> &graph, int v);
 
@@ -87,3 +91,54 @@ int select_random_integer(int n);
 uint64_t select_random_vertex_pair_packed(int n);
 
 std::pair<int, int> select_random_vertex_pair_unpacked(int n);
+
+void complete_join(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2);
+
+void disjoint_union(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2);
+
+void operation_substitution(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2, std::mt19937 &gen);
+
+void operation_composition(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2, std::mt19937 &gen);
+
+void operation_clique_identification(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2, std::mt19937 &gen);
+
+std::vector<uint8_t> adj_matrix_to_g6(const std::vector<std::vector<bool>> &graph);
+
+inline std::pair<size_t, size_t> upper_adj_matrix_flat_index_to_pair_index(size_t x)
+{
+    size_t j = (1 + std::sqrt(8.0 * x + 1)) / 2;
+    size_t i = x - (j * (j - 1) / 2);
+    return {i, j};
+}
+
+inline size_t pair_index_to_upper_adj_matrix_flat_index(size_t i, size_t j)
+{
+    if (i > j)
+    {
+        size_t temp = i;
+        i = j;
+        j = temp;
+    }
+
+    size_t x = j * (j - 1) / 2 + i;
+    return x;
+}
+
+inline size_t pair_index_to_flat_adj_mat_index(size_t n, size_t i, size_t j)
+{
+    size_t mat_index = j * n + i;
+    return mat_index;
+}
+
+inline std::pair<size_t, size_t> flat_adj_matrix_index_to_pair_index(size_t n, size_t matrix_index)
+{
+    size_t j = matrix_index / n;       // floor gives the j'th index.
+    size_t i = matrix_index - (j * n); // remainder gives the i'th index
+    return std::make_pair(i, j);
+}
+
+void write_g6(std::vector<uint8_t>& g6_vector, std::string file_path);
+
+std::vector<std::vector<bool>> g6_to_adj_matrix(std::string &g6_string);
+
+std::string get_random_line_from_g6_file(std::string path, std::mt19937 &gen);

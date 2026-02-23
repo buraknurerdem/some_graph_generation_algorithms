@@ -1,10 +1,10 @@
+// Author: Burak Nur Erdem
+
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <random>
 #include <sstream>
 #include <algorithm>
-
 
 #include "utils.hpp"
 
@@ -256,7 +256,7 @@ double calculate_density(const std::vector<std::vector<bool>> &graph)
 
     if (graph.empty())
     {
-        std::cerr << "Graph empty in calculate_density()" << std::endl;
+        std::cerr << "Warning: Graph empty in calculate_density()" << std::endl;
     }
 
     int edge_count = 0;
@@ -461,7 +461,7 @@ find_a_maximal_clique_including_a_given_vertex(const std::vector<std::vector<boo
     return clique;
 }
 
-void write_graph_to_file(
+std::string create_output_adj_matrix_file_name(
     std::vector<std::vector<bool>> &graph,
     std::string graph_folder,
     std::string type,
@@ -483,27 +483,12 @@ void write_graph_to_file(
         density_dec_str.append(target_length - density_dec_str.length(), '0');
     }
 
-    std::string graph_file_name =
-        graph_folder + "/graph_" + type + "_" + n_str + "_" + density_dec_str + "_" + id_str + ".txt";
-
-    // writing to txt
-    std::ofstream graph_file(graph_file_name);
-    for (int i = 0; i < order; ++i)
-    {
-        for (int j = 0; j < order; ++j)
-        {
-            graph_file << graph[i][j];
-            if (j == order - 1)
-            {
-                graph_file << std::endl;
-            }
-        }
-    }
-    graph_file.close();
-    return;
+    std::string name = graph_folder + "/graph_" + type + "_" + n_str + "_" + density_dec_str + "_" + id_str + ".txt";
+    
+    return name;
 }
 
-void write_graph_to_file_given_filename(std::vector<std::vector<bool>> &graph, std::string output_file_name)
+void write_adj_matrix(std::vector<std::vector<bool>> &graph, std::string output_file_name)
 {
     int order = graph.size();
     std::ofstream graph_file(output_file_name);
@@ -643,4 +628,455 @@ std::pair<int, int> select_random_vertex_pair_unpacked(int n)
     } while (u == v);
 
     return {u, v};
+}
+
+
+void complete_join(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2)
+{
+    int n1 = g1.size();
+    int n2 = g2.size();
+
+    for (int i = 0; i < n1; i++)
+    {
+        for (int j = 0; j < n2; j++)
+        {
+            g1[i].push_back(true);
+        }
+    }
+
+    for (int j = 0; j < n2; j++)
+    {
+        std::vector<bool> temp_vect(n1 + n2, true);
+        for (int i = 0; i < n2; i++)
+        {
+            if (!g2[i][j])
+            {
+                temp_vect[n1 + i] = false;
+            }
+        }
+        g1.push_back(temp_vect);
+    }
+
+    return;
+}
+
+void disjoint_union(std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2)
+{
+    int n1 = g1.size();
+    int n2 = g2.size();
+
+    for (int i = 0; i < n1; i++)
+    {
+        for (int j = 0; j < n2; j++)
+        {
+            g1[i].push_back(false);
+        }
+    }
+
+    for (int j = 0; j < n2; j++)
+    {
+        std::vector<bool> temp_vect(n1 + n2, false);
+        for (int i = 0; i < n2; i++)
+        {
+            if (g2[i][j])
+            {
+                temp_vect[n1 + i] = true;
+            }
+        }
+        g1.push_back(temp_vect);
+    }
+
+    return;
+}
+
+void operation_substitution(
+    std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2, std::mt19937 &gen
+)
+{
+    int n1 = g1.size();
+    int n2 = g2.size();
+
+    std::uniform_int_distribution<> distrib(0, n1 - 1);
+
+    // random vertex of v
+    int v = distrib(gen);
+
+    // neighbors of v
+    std::vector<int> neighbors_v;
+    for (int i = 0; i < n1; i++)
+    {
+        if (g1[v][i])
+        {
+            neighbors_v.push_back(i);
+        }
+    }
+
+    // firstly, use disjoint union to merge adjacency matrices:
+    disjoint_union(g1, g2);
+
+    // create adjacencies between vertices of g2 and neighbors_v
+    for (int i = n1; i < (n1 + n2); i++)
+    {
+        for (int u : neighbors_v)
+        {
+            g1[i][u] = true;
+            g1[u][i] = true;
+        }
+    }
+
+    // remove v from g1
+    for (int i = 0; i < (n1 + n2); i++)
+    {
+        g1[i].erase(g1[i].begin() + v);
+    }
+    g1.erase(g1.begin() + v);
+
+    return;
+}
+
+void operation_composition(
+    std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2, std::mt19937 &gen
+)
+{
+    int n1 = g1.size();
+    int n2 = g2.size();
+
+    if (n1 < 3 || n2 < 3)
+    {
+        return;
+    }
+
+    std::uniform_int_distribution<> distrib1(0, n1 - 1);
+    std::uniform_int_distribution<> distrib2(0, n2 - 1);
+
+    // random vertices from g1 and g2
+    int v1 = distrib1(gen);
+    int v2 = distrib2(gen);
+
+    // neighbors of v1 and v2
+    std::vector<int> neighbors_v1;
+    std::vector<int> neighbors_v2;
+    for (int i = 0; i < n1; i++)
+    {
+        if (g1[v1][i])
+        {
+            neighbors_v1.push_back(i);
+        }
+    }
+    for (int i = 0; i < n2; i++)
+    {
+        if (g2[v2][i])
+        {
+            // here we add n1 to the vertex label since the two graphs will be
+            // merged later and vertex labels (indices) of g2 will increase as much as n1
+            neighbors_v2.push_back(i + n1);
+        }
+    }
+
+    // first use disjoint union to merge adjacency matrices:
+    disjoint_union(g1, g2);
+
+    // create adjacencies between vertices of neighbors_v1 and neighbors_v2
+    for (int u1 : neighbors_v1)
+    {
+        for (int u2 : neighbors_v2)
+        {
+            g1[u1][u2] = true;
+            g1[u2][u1] = true;
+        }
+    }
+
+    // remove v1 and v2 from g2. new label of v2 in g1 is (v2+n1)
+    //  first remove v2 since (v2+n1) > v1
+    for (int i = 0; i < (n1 + n2); i++)
+    {
+        g1[i].erase(g1[i].begin() + v2 + n1);
+    }
+    g1.erase(g1.begin() + v2 + n1);
+    for (int i = 0; i < (n1 + n2 - 1); i++)
+    {
+        g1[i].erase(g1[i].begin() + v1);
+    }
+    g1.erase(g1.begin() + v1);
+}
+
+void operation_clique_identification(
+    std::vector<std::vector<bool>> &g1, const std::vector<std::vector<bool>> &g2, std::mt19937 &gen
+)
+{
+    int n1 = g1.size();
+    int n2 = g2.size();
+
+    std::uniform_int_distribution<> distrib1(0, n1 - 1);
+    std::uniform_int_distribution<> distrib2(0, n2 - 1);
+
+    // random vertices from g1 and g2
+    int v1 = distrib1(gen);
+    int v2 = distrib2(gen);
+
+    // find maximal cliques including the selected vertices
+    auto clique1 = find_a_maximal_clique_including_a_given_vertex(g1, v1);
+    auto clique2 = find_a_maximal_clique_including_a_given_vertex(g2, v2);
+
+    // find the bigger clique, shuffle it, downsize it to the clique of the lesser size
+    int c1_size = clique1.size();
+    int c2_size = clique2.size();
+
+    if (c1_size == 0 || c2_size == 0)
+    {
+        std::cerr << "Clique size 0!" << std::endl;
+    }
+
+    int new_clique_size;
+    if (c1_size >= c2_size)
+    {
+        std::shuffle(clique1.begin(), clique1.end(), gen);
+        clique1.resize(c2_size);
+        new_clique_size = c2_size;
+    }
+    else
+    {
+        std::shuffle(clique2.begin(), clique2.end(), gen);
+        clique2.resize(c1_size);
+        new_clique_size = c1_size;
+    }
+
+    // disjoint union to merge adjacency matrices:
+    disjoint_union(g1, g2);
+
+    // readjust the labels of clique2
+    for (int i = 0; i < new_clique_size; i++)
+    {
+        clique2[i] += n1;
+    }
+
+    // a one to one mapping is carried out on indices.
+    // since a clique is shuffled, there is no bias towards smaller indices
+    // connect a clique1's vertex to neighbors of corresponding vertex in clique2
+    for (int i = 0; i < new_clique_size; i++)
+    {
+        int u1 = clique1[i];
+        int u2 = clique2[i];
+
+        // find neighbors of u2, connect them to u1
+        for (int j = n1; j < (n1 + n2); j++)
+        {
+            if (g1[j][u2])
+            {
+                g1[j][u1] = true;
+                g1[u1][j] = true;
+            }
+        }
+    }
+
+    // remove clique2 from g1. first order decreasing
+    // then iteratively remove the last vertex in clique2
+    std::sort(clique2.begin(), clique2.end());
+    for (int j = new_clique_size - 1; j >= 0; j--)
+    {
+        int vertex_to_remove = clique2[j];
+        clique2.pop_back();
+
+        // remove vertex_to_remove from g1
+        for (int i = 0; i < (n1 + n2 - new_clique_size + j + 1); i++)
+        {
+            g1[i].erase(g1[i].begin() + vertex_to_remove);
+        }
+        g1.erase(g1.begin() + vertex_to_remove);
+    }
+
+    return;
+}
+
+std::vector<uint8_t> adj_matrix_to_g6(const std::vector<std::vector<bool>> &graph)
+{
+    // The algorithm is explained in:
+    // https://users.cecs.anu.edu.au/~bdm/data/formats.txt
+
+    unsigned long n = graph.size();
+    if (n > 68719476735)
+    {
+        std::cerr << "Graph order above 68719476735.\n";
+        std::exit(1);
+    }
+
+    std::vector<uint8_t> g6;
+
+    // Reserving space for the vector
+    g6.reserve((n * (n - 1) / 12) + 5);
+
+    // Pushing the head chars that holds the graph order
+    if (n <= 62)
+    {
+        g6.push_back(n + 63);
+    }
+    else if (n <= 258047)
+    {
+        g6.push_back(126);
+        g6.push_back((0b111111 & (n >> 12)) + 63);
+        g6.push_back((0b111111 & (n >> 6)) + 63);
+        g6.push_back((0b111111 & n) + 63);
+    }
+    else if (n <= 68719476735)
+    {
+        g6.push_back(126);
+        g6.push_back(126);
+        g6.push_back((0b111111 & (n >> 30)) + 63);
+        g6.push_back((0b111111 & (n >> 24)) + 63);
+        g6.push_back((0b111111 & (n >> 18)) + 63);
+        g6.push_back((0b111111 & (n >> 12)) + 63);
+        g6.push_back((0b111111 & (n >> 6)) + 63);
+        g6.push_back((0b111111 & n) + 63);
+    }
+
+    // adj mat to chars
+    uint8_t counter_6bit = 0;
+    uint8_t one_char = 0;
+    for (unsigned long j = 1; j < n; j++)
+    {
+        for (unsigned long i = 0; i < j; i++)
+        {
+            if (graph[i][j])
+                one_char |= 1;
+            counter_6bit++;
+
+            if (counter_6bit == 6)
+            {
+                // std::cout << std::bitset<6>(one_char) << '\n';
+                g6.push_back(one_char + 63);
+                one_char = 0;
+                counter_6bit = 0;
+            }
+            else
+            {
+                one_char <<= 1;
+            }
+        }
+    }
+    // Last char
+    if (counter_6bit != 0)
+    {
+        one_char <<= (6 - counter_6bit - 1);
+        g6.push_back(one_char + 63);
+    }
+
+    return g6;
+}
+
+void write_g6(std::vector<uint8_t>& g6_vector, std::string file_path)
+{
+    std::ofstream output_g6_file;
+    
+    try
+    {
+        output_g6_file.open(file_path, std::ios::app);
+    }
+    catch(...)
+    {
+        std::cerr << "Error when opening output g6 file." << std::endl;
+        return;
+    }
+
+    output_g6_file.write(reinterpret_cast<const char *>(g6_vector.data()), g6_vector.size());
+    output_g6_file.put('\n');
+
+
+    output_g6_file.close();
+
+    return;
+}
+
+std::vector<std::vector<bool>> g6_to_adj_matrix(std::string &g6_string)
+{
+    if (g6_string.empty())
+    {
+        std::cerr << "Warning: g6_string is empty." << std::endl;
+        return std::vector<std::vector<bool>>();
+    }
+
+    size_t g6_str_len = g6_string.length();
+    size_t n = 0; // graph order
+    size_t current_char_index = 1;
+
+
+    // Extract the order
+    // if n <= 62
+    if (g6_string[0] < 126)
+    {
+        n = g6_string[0] - 63;
+    }
+    // if 62 < n <= 258047
+    else if (g6_string[1] < 126)
+    {
+        n = ((size_t)(g6_string[1] - 63) << 12) |
+            ((size_t)(g6_string[2] - 63) << 6) |
+            ((size_t)(g6_string[3] - 63));
+
+        current_char_index = 4;
+    }
+    // if 258047 < n <= 68719476735
+    else
+    {
+        n = ((size_t)(g6_string[2] - 63) << 30) |
+            ((size_t)(g6_string[3] - 63) << 24) |
+            ((size_t)(g6_string[4] - 63) << 18) |
+            ((size_t)(g6_string[5] - 63) << 12) |
+            ((size_t)(g6_string[6] - 63) << 6) |
+            (size_t)(g6_string[7] - 63);
+
+        current_char_index = 8;
+    }
+
+    // initialize empty graph
+    std::vector<std::vector<bool>> graph = std::vector<std::vector<bool>>(n, std::vector<bool>(n, false));
+
+    // vertex indices 
+    size_t i = 0;
+    size_t j = 1;
+    while (current_char_index < g6_str_len)
+    {
+        u_int8_t curr_bin = g6_string[current_char_index] - 63;
+        for (int k = 5; k >= 0; k--)
+        {
+            bool v = 1 & (curr_bin >> k);
+            // Add Edge
+            if (v)
+            {
+                graph[i][j] = true;
+                graph[j][i] = true;
+            }
+            // increment i,j
+            i++;
+            if (i == j) // move to new column if on diagonal
+            {
+                i = 0;
+                j++;
+                if(j >= n) break; // termination for last char
+            }
+        }
+        if (j >= n) break; // termination for last char
+
+        current_char_index++;
+    }
+    return graph;
+}
+
+std::string get_random_line_from_g6_file(std::string path, std::mt19937 &gen)
+{
+    std::ifstream file(path);
+    std::string line;
+    std::string result;
+    size_t count = 0;
+
+    while (std::getline(file, line))
+    {
+        if (line.empty()) continue;
+        std::uniform_int_distribution<> dist(0, count);
+        if (dist(gen) == 0) result = line;
+        count++;
+    }
+
+    if (count == 0) std::cerr << "Error: g6 file empty: " << path << std::endl;
+
+    return result;
 }
