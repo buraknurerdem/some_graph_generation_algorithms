@@ -18,10 +18,10 @@ git clone https://github.com/buraknurerdem/some_graph_generation_algorithms
 
 ## 2. Compiling
 
-The program needs to be compiled. Any `c++` compiler should work. I use `clang++` with the following command.
+The program needs to be compiled. Any `c++` compiler should work. I use `clang++` with the following command. Make sure the working directory is the project folder before running the command.
 
 ```
-clang++ -std=c++20 -O3 -o bin/gen_graph -Iinclude src/*.cpp
+mkdir -p bin && clang++ -std=c++20 -O3 -o bin/gen_graph -Iinclude src/*.cpp
 ```
 
 ## 3. Running the program
