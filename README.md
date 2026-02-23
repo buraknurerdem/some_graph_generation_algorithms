@@ -149,7 +149,7 @@ This algorithm copies a graph, chooses `INT_PARAM1` many vertices randomly and m
 
 Parameters:
 - `INPUT_PATH`: The path of the folder of adjacency matrices or the path of a single .g6 file. E.g. `INPUT_PATH="graphs/erdos-renyi/graphs.g6"`.
-- `INT_PARAM1`: The size of the hole. At least 4. E.g. `INT_PARAM1`=5.
+- `INT_PARAM1`: The size of the hole. At least 4. E.g. `INT_PARAM1=5`.
 
 # References
 

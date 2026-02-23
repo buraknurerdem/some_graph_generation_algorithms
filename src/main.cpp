@@ -1,7 +1,6 @@
 // Author: Burak Nur Erdem
 
 #include <cmath>
-#include <format>
 #include <fstream>
 #include <iostream>
 #include <random>

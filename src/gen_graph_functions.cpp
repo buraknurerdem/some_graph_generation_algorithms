@@ -4,6 +4,8 @@
 #include <map>
 #include <random>
 #include <fstream>
+#include <algorithm>
+#include <filesystem>
 
 #include "gen_graph_functions.hpp"
 #include "utils.hpp"
